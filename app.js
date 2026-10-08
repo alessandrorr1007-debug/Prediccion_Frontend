@@ -17,10 +17,10 @@
 // CONFIGURACIÓN Y CONSTANTES
 // ============================================================================
 const CONFIG = {
-  // En local apunta al puerto 8000; en Render se adapta al mismo dominio o al URL configurado
+  // En local apunta al puerto 8000; en producción apunta al backend de Render
   BACKEND_URL: (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
     ? 'http://localhost:8000'
-    : (window.AULAPREDICT_BACKEND_URL || window.location.origin),
+    : 'https://prediccion-backend-dwq9.onrender.com',
   STABILITY_REQUIRED_MS: 1000,    // 1 segundo de estabilidad continua
   COOLDOWN_MS: 5000,              // 5 segundos de espera tras captura
   MIN_FACE_SIZE_RATIO: 0.18,       // Mínimo ~18-20% del cuadro para garantizar nitidez
