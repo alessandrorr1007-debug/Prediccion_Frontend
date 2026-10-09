@@ -17,9 +17,11 @@
 // CONFIGURACIÓN Y CONSTANTES
 // ============================================================================
 const CONFIG = {
-  // En local apunta al puerto 8000; en producción apunta al backend de Render
-  BACKEND_URL: (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? 'http://localhost:8000'
+  // Endpoints del backend: local (127.0.0.1:8000) y producción en nube (Render)
+  LOCAL_BACKEND_URL: 'http://127.0.0.1:8000',
+  RENDER_BACKEND_URL: 'https://prediccion-backend-dwq9.onrender.com',
+  BACKEND_URL: (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || !window.location.hostname)
+    ? 'http://127.0.0.1:8000'
     : 'https://prediccion-backend-dwq9.onrender.com',
   STABILITY_REQUIRED_MS: 1000,    // 1 segundo de estabilidad continua
   COOLDOWN_MS: 5000,              // 5 segundos de espera tras captura
@@ -161,27 +163,69 @@ function registrarEventos() {
 // VERIFICACIÓN DE SALUD DEL BACKEND (/salud)
 // ============================================================================
 async function verificarSaludBackend() {
+  let url = CONFIG.BACKEND_URL;
+  let data = null;
+
+  // 1. Intentar con la URL configurada
   try {
-    const res = await fetch(`${CONFIG.BACKEND_URL}/salud`, { method: 'GET' });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const res = await fetch(`${url}/salud`, { method: 'GET', signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (res.ok) {
+      data = await res.json();
+    }
+  } catch (_) {
+    // Si falló en entorno local y no estamos usando Render, intentar Render como fallback
+    const isLocalEnv = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || !window.location.hostname;
+    if (isLocalEnv && url !== CONFIG.RENDER_BACKEND_URL) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+        const resFallback = await fetch(`${CONFIG.RENDER_BACKEND_URL}/salud`, { method: 'GET', signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (resFallback.ok) {
+          data = await resFallback.json();
+          CONFIG.BACKEND_URL = CONFIG.RENDER_BACKEND_URL;
+          url = CONFIG.RENDER_BACKEND_URL;
+        }
+      } catch (_) {}
+    } else if (isLocalEnv && url === CONFIG.RENDER_BACKEND_URL) {
+      // Si la URL primaria era Render y falló, intentar fallback a local
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
+        const resFallback = await fetch(`${CONFIG.LOCAL_BACKEND_URL}/salud`, { method: 'GET', signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (resFallback.ok) {
+          data = await resFallback.json();
+          CONFIG.BACKEND_URL = CONFIG.LOCAL_BACKEND_URL;
+          url = CONFIG.LOCAL_BACKEND_URL;
+        }
+      } catch (_) {}
+    }
+  }
+
+  if (data) {
     state.backendOnline = true;
     state.modelReady = data.modelo_listo === true;
 
+    const esRender = url.includes('onrender.com');
+    const etiquetaOrigen = esRender ? ' (Nube Render)' : ' (Local)';
+
     if (state.modelReady) {
-      DOM.backendStatusBadge.className = 'status-pill status-ready';
-      DOM.backendStatusText.textContent = 'Backend Conectado';
+      DOM.backendStatusBadge.className = 'connection-indicator status-ready';
+      DOM.backendStatusText.textContent = `Backend Conectado${etiquetaOrigen}`;
       DOM.warmupBanner.classList.add('hidden');
     } else {
-      DOM.backendStatusBadge.className = 'status-pill status-warming';
-      DOM.backendStatusText.textContent = 'Modelo Preparándose...';
+      DOM.backendStatusBadge.className = 'connection-indicator status-warming';
+      DOM.backendStatusText.textContent = `Modelo Preparándose...${etiquetaOrigen}`;
       DOM.warmupBanner.classList.remove('hidden');
     }
-  } catch (err) {
+  } else {
     state.backendOnline = false;
     state.modelReady = false;
-    DOM.backendStatusBadge.className = 'status-pill status-offline';
+    DOM.backendStatusBadge.className = 'connection-indicator status-offline';
     DOM.backendStatusText.textContent = 'Backend Desconectado';
     DOM.warmupBanner.classList.add('hidden');
   }
@@ -553,7 +597,7 @@ async function ejecutarCaptura(tipoCaptura = "automatica") {
       console.error('Error al enviar imagen al backend:', err);
       mostrarError(
         !state.backendOnline
-          ? 'No se puede conectar con el servidor backend (puerto 8000). Asegúrate de que FastAPI esté corriendo.'
+          ? `No se puede conectar con el servidor backend (${CONFIG.BACKEND_URL}). Asegúrate de que el servidor esté activo.`
           : `Error en análisis: ${err.message}`
       );
     } finally {
