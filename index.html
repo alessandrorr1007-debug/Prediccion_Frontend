@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AulaPredict | Módulo de Detección de Estado Emocional</title>
-  <meta name="description" content="Herramienta de apoyo tutorial para docentes. Detección automática en memoria de expresión facial y estado académico.">
+  <title>AulaPredict | Módulo IMAGEN & PREDICCIÓN</title>
+  <meta name="description" content="Sistema de visión artificial y machine learning para supervisión de exámenes y predicción de riesgo de fraude.">
   
   <!-- Tipografía sobria e institucional -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   
   <link rel="stylesheet" href="style.css">
 
@@ -21,11 +21,11 @@
 
   <div class="page-container">
     
-    <!-- Encabezado institucional simple -->
+    <!-- Encabezado institucional -->
     <header class="app-header">
       <div class="header-main">
-        <h1 class="app-title">AulaPredict</h1>
-        <p class="app-description">Herramienta de estimación emocional para acompañamiento tutorial</p>
+        <h1 class="app-title">AulaPredict &bull; Supervisión de Exámenes</h1>
+        <p class="app-description">Integración de Visión Artificial (Módulo IMAGEN) y Clasificación de Riesgo (Módulo PREDICCIÓN)</p>
       </div>
       <div class="header-status">
         <span id="backend-status-badge" class="connection-indicator status-checking">
@@ -35,57 +35,74 @@
       </div>
     </header>
 
-    <!-- Avisos del sistema (preparación o fallas) -->
+    <!-- Barra de selección de modo de entrada -->
+    <nav class="mode-bar">
+      <div class="mode-tabs">
+        <button id="tab-camera" class="tab-btn active" type="button">📷 Cámara en Vivo</button>
+        <button id="tab-upload" class="tab-btn" type="button">📁 Subir Imagen de Examen</button>
+        <button id="tab-batch" class="tab-btn" type="button">📊 Cargar Reporte IMAGEN (CSV / JSON)</button>
+      </div>
+      <div class="mode-actions">
+        <input type="file" id="file-upload-image" accept="image/*" class="hidden">
+        <input type="file" id="file-upload-batch" accept=".csv,.json" class="hidden">
+      </div>
+    </nav>
+
+    <!-- Avisos del sistema -->
     <div id="warmup-banner" class="notice-box notice-warning hidden" role="status">
-      <span class="notice-text">El modelo de análisis se está iniciando en el servidor. Esto puede tomar unos segundos en el primer uso.</span>
+      <span class="notice-text">Los modelos de IA (YOLOv8 best.pt y DeepFace) se están iniciando en el servidor.</span>
     </div>
 
     <div id="error-banner" class="notice-box notice-error hidden" role="alert">
-      <span id="error-banner-text" class="notice-text">Error en la comunicación con el servidor o la cámara.</span>
+      <span id="error-banner-text" class="notice-text">Error en la comunicación con el servidor.</span>
       <button id="btn-close-error" class="btn-text-close" aria-label="Cerrar mensaje">Cerrar</button>
     </div>
 
-    <!-- Zona principal: Cámara (izquierda) y Resultado (derecha) -->
+    <!-- Zona principal: Módulo IMAGEN (izquierda) y Módulo PREDICCIÓN (derecha) -->
     <main class="workspace-grid">
       
-      <!-- COLUMNA IZQUIERDA: CÁMARA Y ENCUADRE -->
+      <!-- COLUMNA IZQUIERDA: MÓDULO IMAGEN (ENTRADA Y DETECCIONES) -->
       <section class="panel camera-panel">
         <div class="panel-header">
-          <h2 class="panel-title">Cámara y encuadre</h2>
+          <h2 class="panel-title">Módulo IMAGEN: Captura & Detección (best.pt)</h2>
           <span id="detection-state-badge" class="state-pill state-waiting">
-            <span id="detection-state-text">Esperando rostro</span>
+            <span id="detection-state-text">Esperando encuadre</span>
           </span>
         </div>
 
         <div class="camera-wrapper">
+          <!-- Vista de cámara -->
           <div class="video-container" id="camera-viewport">
             <video id="webcam" autoplay playsinline muted></video>
             <canvas id="overlay-canvas"></canvas>
 
+            <!-- Imagen subida manualmente (en modo upload) -->
+            <img id="uploaded-preview-img" class="uploaded-view hidden" alt="Vista previa de imagen">
+
             <!-- Silueta sobria de referencia -->
             <div class="face-guide" id="face-guide">
-              <span class="face-guide-label" id="guide-text">Centra tu rostro aquí</span>
+              <span class="face-guide-label" id="guide-text">Centra al evaluado aquí</span>
             </div>
 
             <!-- Efecto sutil de captura -->
             <div id="camera-flash" class="camera-flash"></div>
 
-            <!-- Mensaje mientras analiza -->
+            <!-- Overlay mientras analiza -->
             <div id="analyzing-overlay" class="analyzing-overlay hidden">
               <span class="analyzing-spinner"></span>
-              <p class="analyzing-message">Analizando imagen...</p>
+              <p class="analyzing-message">Procesando imagen con YOLO (best.pt) y CLAHE...</p>
             </div>
 
             <!-- Aviso cuando la cámara no está disponible -->
             <div id="camera-offline-overlay" class="camera-offline-overlay hidden">
-              <h3 id="camera-offline-title">Acceso a cámara requerido</h3>
-              <p id="camera-offline-desc">Permite el acceso a la cámara web en tu navegador para continuar.</p>
-              <button id="btn-retry-camera" class="btn btn-primary">Reintentar conexión</button>
+              <h3 id="camera-offline-title">Cámara en espera</h3>
+              <p id="camera-offline-desc">Usa el visor de cámara o el botón "Subir Imagen de Examen" en la barra superior.</p>
+              <button id="btn-retry-camera" class="btn btn-primary">Activar cámara</button>
             </div>
           </div>
 
           <!-- Barra de estabilidad funcional -->
-          <div class="stability-row">
+          <div class="stability-row" id="stability-container">
             <span class="stability-text">Estabilidad de captura:</span>
             <div class="stability-bar-track">
               <div id="stability-fill" class="stability-bar-fill"></div>
@@ -93,55 +110,96 @@
             <span id="stability-percent" class="stability-value">0%</span>
           </div>
 
-          <!-- Aviso de privacidad discreto junto a la cámara -->
-          <p class="privacy-note">
-            Privacidad: La imagen no se guarda en disco; solo se procesa en memoria y se muestra el resultado en pantalla.
-          </p>
-
-          <!-- Controles de la cámara -->
+          <!-- Controles de captura -->
           <div class="controls-row">
-            <button id="btn-manual-capture" class="btn btn-secondary">Capturar manualmente</button>
-            <button id="btn-reanalyze" class="btn btn-primary">Volver a analizar</button>
+            <button id="btn-manual-capture" class="btn btn-secondary">Capturar foto</button>
+            <button id="btn-reanalyze" class="btn btn-primary">Volver a capturar</button>
+          </div>
+
+          <!-- Cuadro de características extraídas por IMAGEN -->
+          <div id="image-features-box" class="features-summary hidden">
+            <h3 class="features-title">Características Extraídas por Módulo IMAGEN</h3>
+            <div id="detected-objects-tags" class="tags-container"></div>
+            <div class="metrics-mini-row">
+              <span id="metric-brightness" class="metric-mini">Brillo: --</span>
+              <span id="metric-contrast" class="metric-mini">Contraste: --</span>
+              <span id="metric-sharpness" class="metric-mini">Nitidez: --</span>
+            </div>
           </div>
         </div>
       </section>
 
-      <!-- COLUMNA DERECHA: RESULTADO DEL ANÁLISIS -->
+      <!-- COLUMNA DERECHA: MÓDULO PREDICCIÓN (DECISIÓN INTELIGENTE) -->
       <section class="panel results-panel">
         <div class="panel-header">
-          <h2 class="panel-title">Resultado de la estimación</h2>
+          <h2 class="panel-title">Módulo PREDICCIÓN: Evaluación de Riesgo</h2>
         </div>
 
         <!-- Estado inicial antes de la primera captura -->
         <div id="results-empty" class="results-placeholder">
-          <p class="placeholder-title">Sin captura reciente</p>
-          <p class="placeholder-desc">Colócate de frente a la cámara durante 1 segundo con iluminación adecuada. La foto se tomará automáticamente.</p>
+          <p class="placeholder-title">Sin evaluación reciente</p>
+          <p class="placeholder-desc">Realiza una captura con la cámara o sube una fotografía para que el modelo predictivo analice si hay sospecha de copia o fraude.</p>
         </div>
 
-        <!-- Panel activo con resultados -->
+        <!-- Panel activo con resultados predictivos -->
         <div id="results-content" class="results-data hidden">
           
+          <!-- TARJETA PRINCIPAL DE PREDICCIÓN DE FRAUDE -->
+          <div id="prediction-card" class="prediction-card risk-card-normal">
+            <div class="risk-header">
+              <span id="prediction-risk-badge" class="risk-pill pill-normal">Normal</span>
+              <div class="risk-score">
+                <span class="score-label">Probabilidad de Infracción:</span>
+                <span id="prediction-prob-text" class="score-value">0%</span>
+              </div>
+            </div>
+
+            <!-- Termómetro / Medidor de Riesgo -->
+            <div class="risk-meter-track">
+              <div id="prediction-meter-fill" class="risk-meter-fill" style="width: 5%;"></div>
+            </div>
+
+            <!-- Dictamen del modelo -->
+            <div class="dictamen-box">
+              <p class="dictamen-title">Dictamen del Modelo Predictivo:</p>
+              <p id="prediction-dictamen-text" class="dictamen-desc">No se detectaron elementos no autorizados en la evaluación.</p>
+            </div>
+
+            <!-- Factores clave detectados en la imagen -->
+            <div class="factors-box">
+              <p class="factors-title">Variables Clave Identificadas en la Imagen:</p>
+              <ul id="prediction-factors-list" class="factors-list">
+                <li>Solo se detectaron elementos autorizados.</li>
+              </ul>
+            </div>
+
+            <!-- Recomendación para el evaluador -->
+            <div class="recommendation-box">
+              <span class="recommendation-label">Acción recomendada:</span>
+              <span id="prediction-recommendation-text" class="recommendation-text">Continuar la prueba con supervisión habitual.</span>
+            </div>
+          </div>
+
+          <!-- COMPARACIÓN VISUAL (FOTOGRAFÍA ANOTADA POR YOLO) -->
           <div class="summary-box">
             <div class="photo-preview">
-              <img id="snapshot-img" src="" alt="Fotografía analizada" class="snapshot-frame">
+              <img id="snapshot-img" src="" alt="Fotografía analizada con detección" class="snapshot-frame">
+              <span class="photo-caption">Detección espacial con YOLO (best.pt)</span>
             </div>
             
             <div class="summary-details">
-              <!-- Elemento span oculto para mantener compatibilidad con selector DOM -->
-              <span id="result-emoji" class="hidden"></span>
-
               <div class="detail-row">
                 <span class="detail-label">Emoción predominante:</span>
                 <span id="result-emotion-title" class="detail-value-emotion">Neutral</span>
               </div>
 
               <div class="detail-row">
-                <span class="detail-label">Nivel de confianza:</span>
+                <span class="detail-label">Confianza facial:</span>
                 <span id="result-confidence-val" class="detail-value">0%</span>
               </div>
 
               <div class="detail-row">
-                <span class="detail-label">Estado académico sugerido:</span>
+                <span class="detail-label">Estado tutorial:</span>
                 <span id="academic-status-pill" class="academic-badge academic-estable">
                   <span id="academic-status-icon" class="hidden"></span>
                   <span id="academic-status-text">Estable</span>
@@ -150,23 +208,68 @@
             </div>
           </div>
 
-          <!-- Lista de probabilidades -->
-          <div class="probabilities-container">
-            <h3 class="subsection-title">Distribución de probabilidades</h3>
+          <!-- Distribución de emociones complementaria -->
+          <details class="probabilities-accordion">
+            <summary class="accordion-header">Ver distribución emocional detallada (DeepFace)</summary>
             <div id="prob-bars-list" class="prob-list">
               <!-- Rellenado dinámico por app.js -->
             </div>
-          </div>
+          </details>
 
         </div>
       </section>
 
     </main>
 
-    <!-- SECCIÓN INFERIOR: HISTORIAL DE OBSERVACIONES (TABLA SIMPLE) -->
+    <!-- SECCIÓN INFERIOR: REPORTE POR LOTE (CSV / JSON DE IMAGEN) -->
+    <section id="batch-results-panel" class="panel batch-panel hidden">
+      <div class="panel-header">
+        <h2 class="panel-title">Predicción por Lote: Archivo de Alertas de IMAGEN</h2>
+        <span id="batch-counter" class="history-count">0 alertas</span>
+      </div>
+
+      <div class="batch-kpis">
+        <div class="kpi-card">
+          <span class="kpi-label">Total Alertas Procesadas</span>
+          <span id="kpi-total" class="kpi-value">0</span>
+        </div>
+        <div class="kpi-card kpi-critico">
+          <span class="kpi-label">Fraudes Confirmados</span>
+          <span id="kpi-criticos" class="kpi-value">0</span>
+        </div>
+        <div class="kpi-card kpi-moderado">
+          <span class="kpi-label">Sospechas Moderadas</span>
+          <span id="kpi-moderados" class="kpi-value">0</span>
+        </div>
+        <div class="kpi-card kpi-normal">
+          <span class="kpi-label">Falsas Alarmas / Normales</span>
+          <span id="kpi-normales" class="kpi-value">0</span>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="history-table" id="batch-table">
+          <thead>
+            <tr>
+              <th scope="col" style="width: 8%;">#</th>
+              <th scope="col" style="width: 20%;">Objeto (IMAGEN)</th>
+              <th scope="col" style="width: 15%;">Confianza</th>
+              <th scope="col" style="width: 18%;">Riesgo Predicho</th>
+              <th scope="col" style="width: 15%;">Probabilidad</th>
+              <th scope="col" style="width: 24%;">Dictamen</th>
+            </tr>
+          </thead>
+          <tbody id="batch-tbody">
+            <!-- Filas inyectadas dinámicamente -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- HISTORIAL DE LA SESIÓN -->
     <section class="panel history-panel">
       <div class="panel-header">
-        <h2 class="panel-title">Historial de observaciones en esta sesión</h2>
+        <h2 class="panel-title">Historial de evaluaciones de esta sesión</h2>
         <span id="history-counter" class="history-count">0 registros</span>
       </div>
 
@@ -178,11 +281,11 @@
         <table class="history-table" id="history-table">
           <thead>
             <tr>
-              <th scope="col" style="width: 15%;">Hora</th>
-              <th scope="col" style="width: 15%;">Fotografía</th>
-              <th scope="col" style="width: 25%;">Emoción estimada</th>
-              <th scope="col" style="width: 20%;">Confianza</th>
-              <th scope="col" style="width: 25%;">Estado académico</th>
+              <th scope="col" style="width: 12%;">Hora</th>
+              <th scope="col" style="width: 15%;">Captura</th>
+              <th scope="col" style="width: 25%;">Predicción de Fraude</th>
+              <th scope="col" style="width: 25%;">Objetos Detectados</th>
+              <th scope="col" style="width: 23%;">Estado Tutoría</th>
             </tr>
           </thead>
           <tbody id="history-grid">
@@ -193,7 +296,7 @@
     </section>
 
     <footer class="app-footer">
-      <p>AulaPredict &bull; Módulo de imagen para orientación y tutoría académica</p>
+      <p>AulaPredict &bull; Sistema Integrado de Supervisión de Exámenes y Evaluación Predictiva (Grupo IMAGEN & Grupo PREDICCIÓN)</p>
     </footer>
 
   </div>
